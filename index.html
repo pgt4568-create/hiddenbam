@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>스스로 만드는 온라인 상장 제작소</title>
+  <!-- Tailwind CSS & Google Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <!-- html2canvas & jsPDF 라이브러리 로드 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+    }
+    /* 상장 특유의 서체 스타일링 */
+    .cert-title {
+      font-family: 'Nanum Myeongjo', serif;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+    }
+    .cert-body {
+      font-family: 'Gowun Batang', serif;
+      line-height: 2;
+    }
+    /* 드래그 가능한 스티커 스타일 */
+    .sticker {
+      position: absolute;
+      user-select: none;
+      touch-action: none; /* 모바일에서 드래그 시 화면 스크롤 방지 */
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen py-8 px-4 flex flex-col items-center justify-center">
+
+  <!-- 메인 컨테이너 (공유 상태에 따라 크기가 동적 조정됨) -->
+  <div id="main-container" class="w-full max-w-7xl bg-white rounded-xl shadow-lg overflow-hidden flex flex-col lg:flex-row transition-all duration-300">
+    
+    <!-- 1. 왼쪽: 가이드라인 및 입력 폼 영역 (편집 모드일 때만 노출) -->
+    <div id="editor-sidebar" class="w-full lg:w-5/12 p-6 border-r border-gray-200 flex flex-col justify-between space-y-6">
+      
+      <!-- 만드는 방법 설명 -->
+      <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded">
+        <h2 class="font-bold text-amber-900 mb-2">💡 상장 만드는 방법 3단계</h2>
+        <ol class="text-sm text-amber-800 space-y-2 list-decimal list-inside">
+          <li><strong>인물의 말이나 행동을 떠올린다.</strong></li>
+          <li><strong>인물의 성격과 인물에게 본받을 점을 생각한다.</strong></li>
+          <li><strong>인물에게 주고 싶은 상의 이름과 내용을 쓴다.</strong></li>
+        </ol>
+      </div>
+
+      <!-- 입력 양식 -->
+      <div class="space-y-4">
+        <h3 class="text-lg font-semibold text-gray-800">✍️ 상장 내용 작성하기</h3>
+        
+        <!-- 받는 사람 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">받는 사람 이름</label>
+          <input type="text" id="recipient-input" placeholder="예: 잭슨, 홍길동" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" oninput="updateCertificate()">
+        </div>
+
+        <!-- 상 주는 사람 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">상 주는 사람 이름</label>
+          <input type="text" id="issuer-input" placeholder="예: 담임선생님 김철수, 엄마와 아빠" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" oninput="updateCertificate()">
+        </div>
+
+        <!-- 상 이름 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">상 이름</label>
+          <div class="flex items-center">
+            <input type="text" id="title-input" placeholder="예: 반짝반짝 정직" class="w-full border border-gray-300 rounded-l px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" oninput="updateCertificate()">
+            <span class="bg-gray-200 border border-l-0 border-gray-300 rounded-r px-3 py-2 text-sm font-bold text-gray-700">상</span>
+          </div>
+        </div>
+
+        <!-- 상장 내용 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">상장 내용</label>
+          <textarea id="content-input" rows="4" placeholder="내용을 입력하세요. (예: 축구공이 정원으로 넘어갔을 때 솔직하게 실수를 이야기하는 정직한 모습이 반짝반짝 빛났으므로 이 상장을 드립니다.)" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" oninput="updateCertificate()"></textarea>
+        </div>
+      </div>
+
+      <!-- 꾸미기 도구 -->
+      <div>
+        <h3 class="text-sm font-medium text-gray-700 mb-2">✨ 스티커 꾸미기 (클릭하여 추가 후 상장 안에서 드래그하세요)</h3>
+        <div class="flex flex-wrap gap-2 mb-2">
+          <button onclick="addSticker('⭐')" class="bg-gray-100 hover:bg-gray-200 p-2 rounded text-xl">⭐</button>
+          <button onclick="addSticker('✨')" class="bg-gray-100 hover:bg-gray-200 p-2 rounded text-xl">✨</button>
+          <button onclick="addSticker('💖')" class="bg-gray-100 hover:bg-gray-200 p-2 rounded text-xl">💖</button>
+          <button onclick="addSticker('👍')" class="bg-gray-100 hover:bg-gray-200 p-2 rounded text-xl">👍</button>
+          <button onclick="addSticker('🏅')" class="bg-gray-100 hover:bg-gray-200 p-2 rounded text-xl">🏅</button>
+          <button onclick="addSticker('🎨')" class="bg-gray-100 hover:bg-gray-200 p-2 rounded text-xl">🎨</button>
+          <button onclick="addSticker('🍀')" class="bg-gray-100 hover:bg-gray-200 p-2 rounded text-xl">🍀</button>
+          <button onclick="addSticker('💐')" class="bg-gray-100 hover:bg-gray-200 p-2 rounded text-xl">💐</button>
+        </div>
+        <button onclick="clearAllStickers()" class="text-xs text-red-500 hover:text-red-700 font-medium underline flex items-center gap-1">
+          🗑️ 모든 스티커 지우기
+        </button>
+      </div>
+
+      <!-- AI 피드백 시스템 -->
+      <div class="bg-indigo-50 border border-indigo-200 rounded p-4">
+        <div class="flex justify-between items-center mb-2">
+          <h4 class="font-bold text-indigo-900 text-sm flex items-center gap-1">🤖 AI 상장 작성 평가 피드백</h4>
+          <button onclick="runAIFeedback()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1 rounded transition">평가받기</button>
+        </div>
+        <div id="ai-feedback-result" class="text-xs text-gray-700 leading-relaxed space-y-1">
+          상장 내용을 적은 뒤 '평가받기' 버튼을 눌러주세요. 생성 알고리즘이 3단계 기준에 맞춰 피드백을 드립니다.
+        </div>
+      </div>
+
+      <!-- 다운로드 및 공유 -->
+      <div class="flex flex-col gap-2 pt-4">
+        <button onclick="downloadAsPNG()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded text-sm transition">🖼️ 이미지(PNG)로 다운로드</button>
+        <button onclick="downloadAsPDF()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded text-sm transition">📄 PDF로 다운로드</button>
+        <button onclick="copyShareLink()" class="w-full bg-indigo-700 hover:bg-indigo-800 text-white font-medium py-2 rounded text-sm transition">🔗 완성본 공유 링크 복사</button>
+      </div>
+
+    </div>
+
+    <!-- 2. 오른쪽: 상장 미리보기 영역 -->
+    <div class="w-full lg:flex-1 p-8 bg-gray-50 flex flex-col items-center justify-center">
+      
+      <!-- 상장 용지 컨테이너 -->
+      <div id="certificate-card" class="relative w-full max-w-[500px] aspect-[1/1.15] bg-[#FFFDEE] shadow-xl p-8 border-[12px] border-amber-100 rounded-sm flex flex-col justify-between overflow-hidden">
+        
+        <!-- 고풍스러운 전통 금빛 테두리 (SVG 오버레이) -->
+        <div class="absolute inset-0 pointer-events-none border-4 border-amber-600/40 m-1 z-0"></div>
+        <div class="absolute top-2 left-2 w-8 h-8 pointer-events-none text-amber-600/60 z-0">
+          <svg viewBox="0 0 100 100" fill="currentColor"><path d="M0,0 L40,0 C40,25 25,40 0,40 Z"/><circle cx="15" cy="15" r="5" fill="currentColor"/></svg>
+        </div>
+        <div class="absolute top-2 right-2 w-8 h-8 pointer-events-none text-amber-600/60 scale-x-[-1] z-0">
+          <svg viewBox="0 0 100 100" fill="currentColor"><path d="M0,0 L40,0 C40,25 25,40 0,40 Z"/><circle cx="15" cy="15" r="5" fill="currentColor"/></svg>
+        </div>
+        <div class="absolute bottom-2 left-2 w-8 h-8 pointer-events-none text-amber-600/60 scale-y-[-1] z-0">
+          <svg viewBox="0 0 100 100" fill="currentColor"><path d="M0,0 L40,0 C40,25 25,40 0,40 Z"/><circle cx="15" cy="15" r="5" fill="currentColor"/></svg>
+        </div>
+        <div class="absolute bottom-2 right-2 w-8 h-8 pointer-events-none text-amber-600/60 scale-x-[-1] scale-y-[-1] z-0">
+          <svg viewBox="0 0 100 100" fill="currentColor"><path d="M0,0 L40,0 C40,25 25,40 0,40 Z"/><circle cx="15" cy="15" r="5" fill="currentColor"/></svg>
+        </div>
+
+        <!-- 스티커 레이어 (z-30) -->
+        <div id="sticker-container" class="absolute inset-0 pointer-events-none z-30"></div>
+
+        <!-- 상장 내부 내용물 레이어 (z-10) -->
+        <div class="h-full flex flex-col justify-between relative z-10 py-4">
+          
+          <!-- 상 이름 -->
+          <div class="text-center mt-4">
+            <h1 id="cert-title-display" class="cert-title text-2xl md:text-3xl text-gray-800 font-extrabold">○○상</h1>
+          </div>
+
+          <!-- 받는 사람 -->
+          <div class="text-right pr-4 md:pr-8 mt-4">
+            <span id="cert-recipient-display" class="font-semibold text-lg text-gray-700 border-b border-gray-400 pb-1">받는 이</span>
+          </div>
+
+          <!-- 상장 내용 -->
+          <div class="px-4 text-center my-6 flex-grow flex items-center justify-center">
+            <p id="cert-content-display" class="cert-body text-sm md:text-base text-gray-800 whitespace-pre-wrap leading-relaxed">
+              여기에 상장 내용이 표시됩니다. 왼쪽 입력칸에 내용을 채워 넣으면 실시간으로 업데이트됩니다.
+            </p>
+          </div>
+
+          <!-- 날짜 및 하단 기관/발급인 -->
+          <div class="text-center space-y-2 mb-2">
+            <p id="cert-date-display" class="text-xs md:text-sm text-gray-600 tracking-wide">2026년 07월 01일</p>
+            <p id="cert-issuer-display" class="text-sm md:text-base font-bold text-gray-700 tracking-widest">ㅇㅇㅇ</p>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- [신규] 완성본 전용 페이지 하단 고정 풋터 영역 (View Mode일 때만 활성화) -->
+  <div id="view-mode-footer" class="hidden mt-6 flex flex-col items-center space-y-4">
+    <p class="text-sm text-gray-500">✨ 전달받은 소중한 상장입니다.</p>
+    <div class="flex gap-4">
+      <button onclick="downloadAsPNG()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-6 rounded-lg text-sm shadow transition">🖼️ 이미지로 저장하기</button>
+      <button onclick="resetToEditor()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-6 rounded-lg text-sm shadow transition">🆕 나도 상장 만들기</button>
+    </div>
+  </div>
+
+  <script>
+    // 1. 날짜 자동 설정 (접속 당일 기준)
+    function setTodayDate() {
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const date = String(today.getDate()).padStart(2, '0');
+      document.getElementById('cert-date-display').innerText = `${year}년 ${month}월 ${date}일`;
+    }
+
+    // 2. 실시간 입력 동기화
+    function updateCertificate() {
+      const titleInput = document.getElementById('title-input').value.trim();
+      const recipientInput = document.getElementById('recipient-input').value.trim();
+      const issuerInput = document.getElementById('issuer-input').value.trim();
+      const contentInput = document.getElementById('content-input').value;
+
+      document.getElementById('cert-title-display').innerText = titleInput ? `${titleInput}상` : "○○상";
+      document.getElementById('cert-recipient-display').innerText = recipientInput ? recipientInput : "받는 이";
+      document.getElementById('cert-issuer-display').innerText = issuerInput ? issuerInput : "ㅇㅇㅇ";
+      document.getElementById('cert-content-display').innerText = contentInput.trim() ? contentInput : "여기에 상장 내용이 표시됩니다. 왼쪽 입력칸에 내용을 채워 넣으면 실시간으로 업데이트됩니다.";
+    }
+
+    // 3. 스티커 드래그 앤 드롭 및 개별 삭제 기능
+    // isViewMode 가 true일 경우, 드래그 및 삭제 기능을 완전히 비활성화합니다.
+    function addSticker(emoji, leftPercent = 45, topPercent = 45, isViewMode = false) {
+      const container = document.getElementById('sticker-container');
+      const stickerEl = document.createElement('div');
+      
+      stickerEl.className = 'sticker text-4xl absolute select-none p-2 group';
+      
+      // 모드에 따른 선택 가능 여부 분기
+      if (isViewMode) {
+        stickerEl.className += ' pointer-events-none'; // 완성본 모드에서는 스티커 클릭 및 동작을 원천 배제합니다.
+      } else {
+        stickerEl.className += ' pointer-events-auto';
+      }
+      
+      stickerEl.style.left = `${leftPercent}%`;
+      stickerEl.style.top = `${topPercent}%`;
+      
+      // [수정됨] 완성본 모드가 아니고 마우스를 스티커 위에 올렸을 때만 삭제(×) 버튼이 보여지도록 opacity-0 group-hover:opacity-100 스타일 적용
+      const deleteBtnHtml = isViewMode ? '' : `
+        <button class="delete-btn absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 text-white rounded-full text-[10px] font-bold w-5 h-5 flex items-center justify-center shadow-md focus:outline-none opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50">×</button>
+      `;
+      
+      stickerEl.innerHTML = `
+        <span class="${isViewMode ? '' : 'cursor-grab active:cursor-grabbing'}">${emoji}</span>
+        ${deleteBtnHtml}
+      `;
+
+      // 편집창 모드일 때만 이벤트 부여
+      if (!isViewMode) {
+        let isDragging = false;
+        let startX, startY;
+        let initialLeft, initialTop;
+
+        const onPointerDown = (e) => {
+          if (e.target.classList.contains('delete-btn')) return;
+
+          e.preventDefault();
+          isDragging = true;
+          stickerEl.setPointerCapture(e.pointerId);
+
+          startX = e.clientX;
+          startY = e.clientY;
+          initialLeft = stickerEl.offsetLeft;
+          initialTop = stickerEl.offsetTop;
+
+          stickerEl.addEventListener('pointermove', onPointerMove);
+          stickerEl.addEventListener('pointerup', onPointerUp);
+        };
+
+        const onPointerMove = (e) => {
+          if (!isDragging) return;
+          const dx = e.clientX - startX;
+          const dy = e.clientY - startY;
+
+          const parent = document.getElementById('certificate-card');
+          let newLeft = initialLeft + dx;
+          let newTop = initialTop + dy;
+
+          newLeft = Math.max(-10, Math.min(newLeft, parent.clientWidth - stickerEl.clientWidth + 10));
+          newTop = Math.max(-10, Math.min(newTop, parent.clientHeight - stickerEl.clientHeight + 10));
+
+          stickerEl.style.left = `${newLeft}px`;
+          stickerEl.style.top = `${newTop}px`;
+        };
+
+        const onPointerUp = (e) => {
+          if (!isDragging) return;
+          isDragging = false;
+          stickerEl.releasePointerCapture(e.pointerId);
+          stickerEl.removeEventListener('pointermove', onPointerMove);
+          stickerEl.removeEventListener('pointerup', onPointerUp);
+        };
+
+        stickerEl.addEventListener('pointerdown', onPointerDown);
+
+        stickerEl.querySelector('.delete-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          stickerEl.remove();
+        });
+      }
+
+      container.appendChild(stickerEl);
+    }
+
+    // 모든 스티커 일괄 삭제 기능
+    function clearAllStickers() {
+      const container = document.getElementById('sticker-container');
+      if (container.children.length === 0) {
+        alert("상장에 부착된 스티커가 없습니다.");
+        return;
+      }
+      if (confirm("상장에 붙인 모든 스티커를 지우시겠습니까?")) {
+        container.innerHTML = '';
+      }
+    }
+
+    // 4. 생성형 AI 피드백 평가 기능
+    function runAIFeedback() {
+      const content = document.getElementById('content-input').value.trim();
+      const title = document.getElementById('title-input').value.trim();
+      const feedbackDiv = document.getElementById('ai-feedback-result');
+
+      if (!content || !title) {
+        feedbackDiv.innerHTML = `<span class="text-red-500 font-semibold">⚠️ 상 이름과 내용을 먼저 입력한 후 평가를 실행해 주세요!</span>`;
+        return;
+      }
+
+      feedbackDiv.innerHTML = `<span class="text-indigo-600 font-semibold">🤖 AI가 상장 내용을 분석하고 있습니다...</span>`;
+
+      const actionKeywords = ["때", "하여", "말했", "행동", "보고", "듣고", "이야기할", "가져", "도와", "함께", "나누", "지켜", "지켰"];
+      const traitKeywords = ["정직", "솔직", "친절", "끈기", "노력", "용기", "배려", "성실", "착한", "본받을", "훌륭", "지혜", "책임", "모습"];
+
+      setTimeout(() => {
+        let score = 0;
+        let checks = { step1: false, step2: false, step3: false };
+        let adviceList = [];
+
+        actionKeywords.forEach(kw => {
+          if (content.includes(kw)) checks.step1 = true;
+        });
+
+        traitKeywords.forEach(kw => {
+          if (content.includes(kw) || title.includes(kw)) checks.step2 = true;
+        });
+
+        const commonTopic = title.split("").some(char => content.includes(char));
+        if (content.length > 25 && commonTopic) {
+          checks.step3 = true;
+        }
+
+        if (checks.step1) score += 30;
+        if (checks.step2) score += 35;
+        if (checks.step3) score += 35;
+
+        if (!checks.step1) {
+          adviceList.push(`• <strong>행동/말 보완</strong>: 상을 주는 구체적인 원인(예: '~했을 때', '~라고 솔직하게 말했을 때')을 보완해 보세요.`);
+        }
+        if (!checks.step2) {
+          adviceList.push(`• <strong>성격/본받을 점 보완</strong>: 인물의 좋은 성격(예: '정직한', '배려심 깊은')이나 배울 점을 명시해주면 좋겠어요.`);
+        }
+        if (content.length < 20) {
+          adviceList.push(`• <strong>분량 확대</strong>: 상장의 내용이 조금 짧습니다. 인물의 행동과 배울 점을 한 문장 더 추가해 보세요.`);
+        }
+
+        let feedbackHTML = `
+          <div class="mt-2">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-bold text-gray-800">📊 완성도 점수: <span class="text-indigo-600">${score}/100</span></span>
+              <span class="text-xs px-2 py-0.5 rounded ${score >= 70 ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}">
+                ${score >= 90 ? '매우 훌륭함' : score >= 60 ? '보통' : '개선 필요'}
+              </span>
+            </div>
+        `;
+
+        if (score >= 95) {
+          feedbackHTML += `<p class="text-green-700 mt-1">👏 <strong>정말 잘 쓰셨어요!</strong> 행동의 계기, 배울 점, 상의 명칭이 조화롭게 연결된 완성도 높은 상장입니다.</p>`;
+        } else {
+          feedbackHTML += `
+            <p class="text-indigo-800 font-semibold mt-1">💡 더 좋은 상장을 위한 작성 가이드:</p>
+            <ul class="list-none space-y-1 mt-1 text-gray-600">
+              ${adviceList.join("")}
+            </ul>
+          `;
+        }
+
+        feedbackHTML += `</div>`;
+        feedbackDiv.innerHTML = feedbackHTML;
+      }, 800);
+    }
+
+    // 5. 이미지(PNG) 다운로드 기능
+    function downloadAsPNG() {
+      const card = document.getElementById('certificate-card');
+      const deleteButtons = card.querySelectorAll('.delete-btn');
+      deleteButtons.forEach(btn => btn.style.display = 'none');
+
+      html2canvas(card, { scale: 2, useCORS: true, backgroundColor: '#FFFDEE' }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `${document.getElementById('recipient-input').value || '상장'}_상장.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        
+        deleteButtons.forEach(btn => btn.style.display = '');
+      });
+    }
+
+    // 6. PDF 다운로드 기능
+    function downloadAsPDF() {
+      const card = document.getElementById('certificate-card');
+      const deleteButtons = card.querySelectorAll('.delete-btn');
+      deleteButtons.forEach(btn => btn.style.display = 'none');
+
+      html2canvas(card, { scale: 2, useCORS: true }).then(canvas => {
+        const imgData = canvas.toDataURL('image/png');
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const imgWidth = 210;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        
+        pdf.addImage(imgData, 'PNG', 0, 10, imgWidth, imgHeight);
+        pdf.save(`${document.getElementById('recipient-input').value || '상장'}_상장.pdf`);
+
+        deleteButtons.forEach(btn => btn.style.display = '');
+      });
+    }
+
+    // 7. [수정됨] 완성본 전용 뷰어 공유 링크 생성 (스티커들의 가로/세로 백분율 위치도 함께 동봉)
+    function copyShareLink() {
+      const title = document.getElementById('title-input').value;
+      const recipient = document.getElementById('recipient-input').value;
+      const issuer = document.getElementById('issuer-input').value;
+      const content = document.getElementById('content-input').value;
+
+      // 상장 안의 스티커 수집 및 백분율 환산
+      const stickers = [];
+      const card = document.getElementById('certificate-card');
+      document.querySelectorAll('#sticker-container .sticker').forEach(el => {
+        const emoji = el.querySelector('span').innerText;
+        const leftPercent = (el.offsetLeft / card.clientWidth) * 100;
+        const topPercent = (el.offsetTop / card.clientHeight) * 100;
+        stickers.push({ e: emoji, l: leftPercent, t: topPercent });
+      });
+
+      const data = { t: title, r: recipient, i: issuer, c: content, s: stickers };
+      const jsonStr = JSON.stringify(data);
+      const encoded = btoa(encodeURIComponent(jsonStr));
+      // 이전의 수정 가능한 상태가 아닌, 뷰 모드 전용 해시(#view=)로 저장합니다.
+      const shareUrl = `${window.location.origin}${window.location.pathname}#view=${encoded}`;
+
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        alert("성공적으로 '완성본 공유용 링크'가 복사되었습니다!\n다른 사람이 이 주소로 들어오면 편집창 없이 완성된 상장 모습만 보고, 이미지로 저장할 수 있습니다.");
+      }).catch(err => {
+        alert("링크 복사에 실패했습니다. 주소창의 URL을 직접 공유하셔도 됩니다.");
+      });
+    }
+
+    // 8. [신규] 공유 상태 및 모드 체크 핸들러
+    function handleViewMode() {
+      const hash = window.location.hash;
+      const container = document.getElementById('main-container');
+      const sidebar = document.getElementById('editor-sidebar');
+      const footer = document.getElementById('view-mode-footer');
+
+      if (hash && hash.startsWith('#view=')) {
+        // 완성본 모드
+        sidebar.classList.add('hidden');
+        footer.classList.remove('hidden');
+        container.classList.remove('max-w-7xl');
+        container.classList.add('max-w-2xl'); // 상장 크기에 맞춰 센터 정렬
+
+        loadDataAndRender(hash.replace('#view=', ''), true);
+      } else {
+        // 편집 모드
+        sidebar.classList.remove('hidden');
+        footer.classList.add('hidden');
+        container.classList.remove('max-w-2xl');
+        container.classList.add('max-w-7xl');
+
+        if (hash && hash.startsWith('#cert=')) {
+          loadDataAndRender(hash.replace('#cert=', ''), false);
+        } else {
+          updateCertificate();
+        }
+      }
+    }
+
+    // [신규] 인코딩 정보 디코딩 후 상장에 렌더링
+    function loadDataAndRender(base64Data, isViewMode) {
+      try {
+        const decodedJson = decodeURIComponent(atob(base64Data));
+        const data = JSON.parse(decodedJson);
+
+        if (data.t) document.getElementById('title-input').value = data.t;
+        if (data.r) document.getElementById('recipient-input').value = data.r;
+        if (data.i) document.getElementById('issuer-input').value = data.i;
+        if (data.c) document.getElementById('content-input').value = data.c;
+
+        updateCertificate();
+
+        // 스티커 지우기 후 다시 배치
+        const stickerContainer = document.getElementById('sticker-container');
+        stickerContainer.innerHTML = '';
+        if (data.s && Array.isArray(data.s)) {
+          data.s.forEach(stk => {
+            addSticker(stk.e, stk.l, stk.t, isViewMode);
+          });
+        }
+      } catch (e) {
+        console.warn("데이터 로드 중 실패했습니다.", e);
+      }
+    }
+
+    // [신규] '나도 상장 만들기' 버튼 클릭 시 주소 리셋
+    function resetToEditor() {
+      window.location.href = window.location.origin + window.location.pathname;
+    }
+
+    // 초기 실행 및 해시 변경 시 모드 갱신
+    window.onload = function() {
+      setTodayDate();
+      handleViewMode();
+    };
+
+    window.onhashchange = function() {
+      handleViewMode();
+    };
+  </script>
+</body>
+</html>
