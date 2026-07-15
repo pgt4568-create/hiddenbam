@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>히든밤 (Hidden Bomb) - 카드 뒤집기 게임</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --success-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --bg-color: #f5f7fa;
+            --card-back: #2c3e50;
+        }
+
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 5px;
+            font-size: 2.2rem;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 25px;
+            font-size: 1rem;
+        }
+
+        /* 게임 레이아웃 */
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        /* 대시보드 (주사위 및 점수) */
+        .dashboard {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            background: white;
+            padding: 15px 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            box-sizing: border-box;
+        }
+
+        .info-panel {
+            font-size: 1.1rem;
+            color: #34495e;
+            line-height: 1.6;
+        }
+
+        .info-panel span {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        /* 주사위 스타일 */
+        .dice-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dice {
+            width: 70px;
+            height: 70px;
+            background: white;
+            border: 3px solid #34495e;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            font-weight: bold;
+            color: #34495e;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            user-select: none;
+        }
+
+        .dice:hover {
+            transform: scale(1.05);
+        }
+
+        .dice:active {
+            transform: scale(0.95);
+        }
+
+        .dice.rolling {
+            animation: spin 0.6s ease-in-out;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg) scale(0.9); }
+            50% { transform: rotate(180deg) scale(1.1); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+
+        /* 카드 보드판 */
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            width: 100%;
+        }
+
+        /* 카드 3D 효과 */
+        .card-container {
+            perspective: 1000px;
+            height: 160px;
+        }
+
+        .card {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+        }
+
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 15px;
+            box-sizing: border-box;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            font-weight: bold;
+            text-align: center;
+            font-size: 1rem;
+            word-break: keep-all;
+        }
+
+        /* 카드 앞면 (내용 공개) */
+        .card-front {
+            background-color: white;
+            color: #2c3e50;
+            transform: rotateY(180deg);
+            border: 2px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .card-type-badge {
+            font-size: 0.8rem;
+            padding: 2px 8px;
+            border-radius: 20px;
+            align-self: flex-end;
+            margin-top: 5px;
+        }
+
+        .type-fact {
+            background-color: #ebf5fb;
+            color: #2980b9;
+        }
+
+        .type-opinion {
+            background-color: #fdf2e9;
+            color: #e67e22;
+        }
+
+        /* 카드 뒷면 (숨김 상태) */
+        .card-back {
+            background: linear-gradient(135deg, var(--card-back), #1a252f);
+            color: white;
+            border: 2px solid #34495e;
+        }
+
+        .card-back::after {
+            content: "💥";
+            font-size: 2.5rem;
+            opacity: 0.8;
+        }
+
+        /* 메시지 알림 */
+        .status-message {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #2c3e50;
+            min-height: 30px;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        /* 반응형 모바일 최적화 */
+        @media (max-width: 600px) {
+            .board {
+                gap: 10px;
+            }
+            .card-container {
+                height: 130px;
+            }
+            .card-face {
+                font-size: 0.85rem;
+                padding: 10px;
+            }
+            .card-back::after {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>💣 히든밤 (Hidden Bomb)</h1>
+    <div class="subtitle">사실과 의견을 구분하여 카드를 획득하는 보드게임!</div>
+
+    <div class="game-container">
+        <div class="dashboard">
+            <div class="info-panel">
+                <div>남은 카드 더미: <span id="deck-count">0</span>장</div>
+                <div>내가 획득한 카드: <span id="score">0</span>장</div>
+                <div>남은 뒤집기 횟수: <span id="turns-left" style="color: #e74c3c;">주사위를 굴려주세요</span></div>
+            </div>
+            
+            <div class="dice-area">
+                <div class="dice" id="dice-btn">🎲</div>
+                <div style="font-size: 0.8rem; color:#7f8c8d; font-weight: bold;">터치하여 굴리기</div>
+            </div>
+        </div>
+
+        <div class="status-message" id="status-text">주사위를 굴려 게임을 시작해 주세요!</div>
+
+        <div class="board" id="board">
+            </div>
+    </div>
+
+    <script>
+        // 사실과 의견 카드 풀 정의 (기존 문장 + 요청하신 한글 파일 문장 통합)
+        const rawCardPool = [
+            // [기존 사실 카드]
+            { type: "fact", text: "지구는 태양 주위를 공전한다." },
+            { type: "fact", text: "대한민국의 수도는 서울이다." },
+            { type: "fact", text: "물은 섭씨 100도에서 끓는다." },
+            { type: "fact", text: "올림픽은 4년마다 개최된다." },
+            { type: "fact", text: "나비는 곤충류에 속한다." },
+            { type: "fact", text: "세종대왕은 훈민정음을 창제하셨다." },
+            { type: "fact", text: "컴퓨터는 이진법을 사용하여 연산한다." },
+            { type: "fact", text: "한글의 자음은 총 14개이다." },
+            { type: "fact", text: "태양계에서 가장 큰 행성은 목성이다." },
+            { type: "fact", text: "스마트폰은 전자기기이다." },
+            { type: "fact", text: "사과는 나무에서 자라는 과일이다." },
+            { type: "fact", text: "1년은 보통 365일이다." },
+            
+            // [추가된 사실 카드 (한글 파일 내용)]
+            { type: "fact", text: "강아지는 네 발로 걷는다." },
+            { type: "fact", text: "고양이는 수염이 있다." },
+            { type: "fact", text: "토끼는 긴 귀를 가지고 있다." },
+            { type: "fact", text: "사자는 동물이다." },
+            { type: "fact", text: "펭귄은 새의 한 종류이다." },
+            { type: "fact", text: "물고기는 아가미로 숨을 쉰다." },
+            { type: "fact", text: "연필은 글씨를 쓸 때 사용한다." },
+            { type: "fact", text: "비가 오면 우산을 쓴다." },
+            { type: "fact", text: "자동차는 바퀴로 움직인다." },
+            { type: "fact", text: "겨울에는 날씨가 춥다." },
+            { type: "fact", text: "학생들은 학교에서 공부한다." },
+            { type: "fact", text: "여름에는 매미가 운다." },
+            { type: "fact", text: "개미는 곤충이다." },
+            { type: "fact", text: "해는 동쪽에서 뜬다." },
+            { type: "fact", text: "코끼리는 긴 코를 가지고 있다." },
+            { type: "fact", text: "기린은 목이 길다." },
+            { type: "fact", text: "자전거에는 바퀴가 있다." },
+            
+            // [기존 의견 카드]
+            { type: "opinion", text: "수학은 모든 과목 중에서 가장 재미있다." },
+            { type: "opinion", text: "오늘 날씨는 매우 상쾌하고 좋다." },
+            { type: "opinion", text: "딸기 아이스크림이 초코맛보다 맛있다." },
+            { type: "opinion", text: "강아지는 고양이보다 귀여운 동물이다." },
+            { type: "opinion", text: "축구는 보는 것보다 직접 하는 게 더 즐겁다." },
+            { type: "opinion", text: "이 책은 올해 최고의 베스트셀러가 될 것이다." },
+            { type: "opinion", text: "파란색은 마음을 가장 편안하게 해 준다." },
+            { type: "opinion", text: "겨울보다는 따뜻한 여름이 훨씬 낫다." },
+            { type: "opinion", text: "그 영화는 너무 지루해서 졸릴 지경이었다." },
+            { type: "opinion", text: "매운 음식을 잘 먹는 사람이 멋있다." },
+            { type: "opinion", text: "이 게임은 세상에서 가장 짜릿하다." },
+            { type: "opinion", text: "민트초코는 최고의 디저트 맛이다." },
+
+            // [추가된 의견 카드 (한글 파일 내용)]
+            { type: "opinion", text: "독도는 정말 멋있다." },
+            { type: "opinion", text: "강아지는 가장 귀여운 동물이다." },
+            { type: "opinion", text: "고양이는 강아지보다 더 사랑스럽다." },
+            { type: "opinion", text: "토끼를 키우는 것이 좋다." },
+            { type: "opinion", text: "사자는 가장 멋진 동물이다." },
+            { type: "opinion", text: "개미를 관찰하는 것은 재미있다." },
+            { type: "opinion", text: "자전거 타기는 최고의 운동이다." },
+            { type: "opinion", text: "겨울이 여름보다 더 좋다." },
+            { type: "opinion", text: "여행은 사람을 행복하게 만든다." },
+            { type: "opinion", text: "운동을 열심히 해야 한다." },
+            { type: "opinion", text: "공공예절을 잘 지켜야 한다." },
+            { type: "opinion", text: "기린은 정말 멋지다." }
+        ];
+
+        let cardDeck = []; // 전체 덱
+        let boardCards = []; // 현재 바닥에 깔린 9장의 카드 상태
+        let selectedCards = []; // 플레이어가 이번 턴에 뒤집은 카드들
+        
+        let diceValue = 0; // 주사위 눈
+        let turnsLeft = 0; // 남은 카드 뒤집기 횟수
+        let playerScore = 0; // 획득 카드 수
+        let isProcessing = false; // 자동 연출 중 사용자 입력 방지 플래그
+
+        // 요소 선택
+        const diceBtn = document.getElementById('dice-btn');
+        const deckCountEl = document.getElementById('deck-count');
+        const scoreEl = document.getElementById('score');
+        const turnsLeftEl = document.getElementById('turns-left');
+        const statusTextEl = document.getElementById('status-text');
+        const boardEl = document.getElementById('board');
+
+        // 카드 섞기 함수 (Fisher-Yates)
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // 게임 초기화
+        function initGame() {
+            cardDeck = shuffle([...rawCardPool]);
+            boardCards = [];
+            selectedCards = [];
+            playerScore = 0;
+            diceValue = 0;
+            turnsLeft = 0;
+            isProcessing = false;
+
+            scoreEl.textContent = playerScore;
+            turnsLeftEl.textContent = "주사위를 굴려주세요";
+            statusTextEl.textContent = "주사위를 굴려 게임을 시작하세요!";
+            diceBtn.textContent = "🎲";
+
+            // 처음에 9장 뽑아 바닥에 깔기
+            for (let i = 0; i < 9; i++) {
+                if (cardDeck.length > 0) {
+                    boardCards.push(cardDeck.pop());
+                } else {
+                    boardCards.push(null); // 덱 바닥날 경우 예방
+                }
+            }
+
+            renderBoard();
+            updateDeckCount();
+        }
+
+        // 남은 덱 장수 갱신
+        function updateDeckCount() {
+            deckCountEl.textContent = cardDeck.length;
+        }
+
+        // 바닥판 렌더링
+        function renderBoard() {
+            boardEl.innerHTML = '';
+            boardCards.forEach((cardData, index) => {
+                const cardContainer = document.createElement('div');
+                cardContainer.classList.add('card-container');
+
+                if (!cardData) {
+                    // 카드가 채워지지 않고 비어 있는 경우 빈 슬롯 표시
+                    cardContainer.style.visibility = "hidden";
+                    boardEl.appendChild(cardContainer);
+                    return;
+                }
+
+                const card = document.createElement('div');
+                card.classList.add('card');
+                card.dataset.index = index;
+
+                const cardFront = document.createElement('div');
+                cardFront.classList.add('card-face', 'card-front');
+                
+                const textSpan = document.createElement('span');
+                textSpan.textContent = cardData.text;
+                
+                const typeBadge = document.createElement('span');
+                typeBadge.classList.add('card-type-badge');
+                if (cardData.type === 'fact') {
+                    typeBadge.classList.add('type-fact');
+                    typeBadge.textContent = "사실";
+                } else {
+                    typeBadge.classList.add('type-opinion');
+                    typeBadge.textContent = "의견";
+                }
+
+                cardFront.appendChild(textSpan);
+                cardFront.appendChild(typeBadge);
+
+                const cardBack = document.createElement('div');
+                cardBack.classList.add('card-face', 'card-back');
+
+                card.appendChild(cardFront);
+                card.appendChild(cardBack);
+                cardContainer.appendChild(card);
+                boardEl.appendChild(cardContainer);
+
+                // 클릭 이벤트
+                card.addEventListener('click', () => handleCardClick(card, index));
+            });
+        }
+
+        // 주사위 굴리기 클릭 이벤트
+        diceBtn.addEventListener('click', () => {
+            if (isProcessing) return;
+            if (turnsLeft > 0) {
+                statusTextEl.textContent = "아직 뒤집을 기회가 남아있습니다!";
+                return;
+            }
+
+            // 주사위 애니메이션 시작
+            diceBtn.classList.add('rolling');
+            isProcessing = true;
+            statusTextEl.textContent = "주사위가 굴러가는 중...";
+
+            setTimeout(() => {
+                // 주사위 눈 결정 (1~6)
+                diceValue = Math.floor(Math.random() * 6) + 1;
+                diceBtn.textContent = diceValue;
+                diceBtn.classList.remove('rolling');
+                
+                turnsLeft = diceValue;
+                turnsLeftEl.textContent = `${turnsLeft}번 남음`;
+                statusTextEl.textContent = `주사위 결과: ${diceValue}! 카드를 ${diceValue}장 순서대로 뒤집으세요.`;
+                
+                // 이전 선택 초기화 및 바닥 카드 뒤집힌 것 복원
+                resetCurrentTurnSelection();
+                isProcessing = false;
+            }, 600);
+        });
+
+        // 이번 턴 선택 복원
+        function resetCurrentTurnSelection() {
+            selectedCards = [];
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => card.classList.remove('flipped'));
+        }
+
+        // 카드 클릭 시 핸들러
+        function handleCardClick(cardElement, index) {
+            if (isProcessing) return;
+            if (turnsLeft <= 0) {
+                statusTextEl.textContent = "먼저 주사위를 굴려주세요!";
+                return;
+            }
+
+            // 이미 뒤집힌 카드 클릭 무시
+            if (cardElement.classList.contains('flipped')) return;
+
+            // 카드 뒤집기 연출
+            cardElement.classList.add('flipped');
+            selectedCards.push({ element: cardElement, index: index, data: boardCards[index] });
+            
+            turnsLeft--;
+            turnsLeftEl.textContent = turnsLeft > 0 ? `${turnsLeft}번 남음` : "0번 남음";
+
+            // 모든 횟수를 소진했을 때 판정 진행
+            if (turnsLeft === 0) {
+                isProcessing = true;
+                setTimeout(evaluateTurnResult, 1000); // 카드가 완전히 열리는 걸 볼 수 있게 1초 딜레이
+            }
+        }
+
+        // 이번 턴 성공/실패 여부 판정
+        function evaluateTurnResult() {
+            const types = selectedCards.map(item => item.data.type);
+            
+            // 모든 요소가 동일한지 판별 (모두 'fact'이거나 모두 'opinion'인지)
+            const allSame = types.every(type => type === types[0]);
+
+            if (allSame) {
+                // 💥 성공! 카드를 가져오고 빈 곳을 채운다
+                const collectedCount = selectedCards.length;
+                playerScore += collectedCount;
+                scoreEl.textContent = playerScore;
+
+                statusTextEl.innerHTML = `<span style="color:var(--success-color);">🎉 성공! 모두 ${types[0] === 'fact' ? '사실' : '의견'} 카드입니다. (+${collectedCount}장)</span>`;
+
+                // 가져간 카드 사라짐 연출 적용 후 교체
+                selectedCards.forEach(item => {
+                    item.element.style.transition = "transform 0.5s, opacity 0.5s";
+                    item.element.style.opacity = "0";
+                    item.element.style.transform = "scale(0.5) rotateY(180deg)";
+                });
+
+                // 잠시 후 새 카드로 리필
+                setTimeout(() => {
+                    selectedCards.forEach(item => {
+                        if (cardDeck.length > 0) {
+                            boardCards[item.index] = cardDeck.pop();
+                        } else {
+                            boardCards[item.index] = null; // 남은 덱이 없으면 빈 상태
+                        }
+                    });
+                    
+                    renderBoard();
+                    updateDeckCount();
+                    checkGameOver();
+                    isProcessing = false;
+                }, 600);
+
+            } else {
+                // 😢 실패! 다시 뒤집어 놓는다
+                statusTextEl.innerHTML = `<span style="color:var(--danger-color);">❌ 실패! 사실과 의견이 섞여있습니다.</span>`;
+                
+                setTimeout(() => {
+                    selectedCards.forEach(item => {
+                        item.element.classList.remove('flipped');
+                    });
+                    isProcessing = false;
+                }, 1200);
+            }
+        }
+
+        // 게임 종료 체크
+        function checkGameOver() {
+            // 바닥에 깔린 유효한 카드가 아예 없거나, 덱도 전부 비었을 때 종료
+            const activeCardsOnBoard = boardCards.filter(c => c !== null).length;
+            if (activeCardsOnBoard === 0 && cardDeck.length === 0) {
+                statusTextEl.innerHTML = `🏆 게임 종료! 최종 획득한 카드: ${playerScore}장!`;
+                turnsLeftEl.textContent = "게임 오버";
+            }
+        }
+
+        // 첫 실행
+        initGame();
+    </script>
+</body>
+</html>
